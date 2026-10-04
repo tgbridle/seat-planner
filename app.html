@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seat Planner</title>
+  <meta name="description" content="Plan your wedding seating: arrange guests around tables with ease.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #faf7f2;
+      --ink: #2f2a26;
+      --muted: #7a7068;
+      --faint: #aaa197;
+      --accent: #b08d57;
+      --accent-soft: #f3ead9;
+      --card: #ffffff;
+      --line: #e8e0d4;
+      --table: #fffdf9;
+      --seat: #efe3cc;
+      --danger: #b5523b;
+      --ok: #5b8a57;
+      --shadow: 0 6px 20px rgba(80, 60, 30, 0.10);
+      --shadow-lg: 0 14px 36px rgba(80, 60, 30, 0.18);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1a18;
+        --ink: #f3ede4;
+        --muted: #b3a99c;
+        --faint: #7d746a;
+        --accent: #d4b07a;
+        --accent-soft: #3a3227;
+        --card: #252220;
+        --line: #3a3531;
+        --table: #2e2a27;
+        --seat: #4a3f30;
+        --danger: #e08a74;
+        --ok: #8fc08a;
+        --shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.5);
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", system-ui, sans-serif;
+      font-size: 14px;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ---------- Top bar ---------- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--line);
+      background: var(--card);
+    }
+
+    .brand {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-weight: 600;
+      font-size: 1.4rem;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .history { display: flex; gap: 6px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--card);
+      font-weight: 500;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn svg { width: 16px; height: 16px; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--card); }
+    .btn.primary:hover:not(:disabled) { background: var(--accent); opacity: 0.88; }
+    .btn.danger-text { color: var(--danger); }
+    .btn.danger-text:hover:not(:disabled) { border-color: var(--danger); background: transparent; }
+
+    /* ---------- Layout ---------- */
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      min-height: calc(100vh - 61px);
+    }
+
+    .stage { padding: 32px 24px 48px; min-width: 0; }
+
+    .event {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .event-name {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-weight: 600;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      line-height: 1.2;
+      padding: 0 6px;
+      border-radius: 6px;
+      outline: none;
+      cursor: text;
+    }
+    .event-name[contenteditable="true"] { background: var(--accent-soft); }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: var(--muted);
+    }
+    .icon-btn:hover { color: var(--accent); background: var(--accent-soft); }
+    .icon-btn svg { width: 18px; height: 18px; }
+
+    .hint {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-bottom: 20px;
+    }
+
+    /* ---------- Floor plan (the "room") ---------- */
+    .floor { overflow: auto; border-radius: 12px; }
+    .room {
+      position: relative;
+      min-height: 240px;
+      background-image: radial-gradient(var(--line) 1px, transparent 1px);
+      background-size: 22px 22px;
+    }
+
+    .table-wrap { position: absolute; }
+    .table-wrap:hover { z-index: 5; }
+    .table-wrap.moving { z-index: 20; }
+
+    .surface {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: var(--table);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      cursor: grab;
+      user-select: none;
+      touch-action: none; /* lets a finger drag the table instead of scrolling */
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .surface.shape-rect, .surface.shape-square { border-radius: 10px; }
+    .surface.shape-round, .surface.shape-oval { border-radius: 50%; }
+    .table-wrap:hover .surface { border-color: var(--accent); }
+    .table-wrap.selected .surface {
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 0 6px var(--accent-soft), var(--shadow);
+    }
+    .table-wrap.selected .surface > .tname { color: var(--accent); }
+    .table-wrap.moving .surface { cursor: grabbing; box-shadow: var(--shadow-lg); }
+
+    .tname {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 1.2rem;
+      font-weight: 600;
+      padding: 0 4px;
+      border-radius: 4px;
+      outline: none;
+      cursor: text;
+      max-width: 90%;
+      text-align: center;
+    }
+    .tname[contenteditable="true"] { background: var(--accent-soft); user-select: text; }
+    .tcount { color: var(--muted); font-size: 0.8rem; }
+    .tcount.full { color: var(--ok); font-weight: 600; }
+
+    /* "+ Add guest" on the table top */
+    .add-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-top: 4px;
+      padding: 3px 10px;
+      border: 1px solid var(--accent-soft);
+      border-radius: 999px;
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .add-pill:hover { background: var(--accent-soft); border-color: var(--accent); }
+    .add-pill svg { width: 12px; height: 12px; }
+
+    .seat {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      margin: -15px 0 0 -15px;
+      border-radius: 50%;
+      background: var(--seat);
+      border: 1px solid var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .seat.selected { background: var(--accent); color: var(--card); }
+
+    /* Empty seats: click to add a guest there */
+    .seat.open {
+      background: transparent;
+      border: 1.5px dashed var(--accent);
+      color: var(--accent);
+      opacity: 0.6;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .seat.open svg { width: 14px; height: 14px; opacity: 0; transition: opacity 0.15s; }
+    .seat.open:hover { opacity: 1; background: var(--accent-soft); }
+    .seat.open:hover svg { opacity: 1; }
+
+    .label {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      max-width: 120px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .label:hover { background: var(--card); box-shadow: var(--shadow); }
+    .label.selected { background: var(--accent-soft); box-shadow: 0 0 0 1.5px var(--accent); }
+
+    .gtext {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
+    }
+
+    .x {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 18px;
+      visibility: hidden;
+    }
+    .x:hover { color: var(--card); background: var(--danger); }
+    /* On the table, the × floats just outside the name so the name stays centred. */
+    .label .x {
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: -2px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+    .label:hover .x { visibility: visible; }
+
+    /* Drag and drop feedback */
+    .drop-over.seat, .drop-over.label { outline: 2px dashed var(--accent); outline-offset: 2px; }
+    .drop-over.seat.open { opacity: 1; background: var(--accent-soft); }
+    .drop-over.surface { border: 2px dashed var(--accent); background: var(--accent-soft); }
+    .drop-over.group { background: var(--accent-soft); }
+    .drop-over.row { outline: 2px dashed var(--accent); }
+
+    /* Table menu (appears on hover, or tap on touch screens) */
+    .table-menu {
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      transform: translateX(-50%);
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      white-space: nowrap;
+      display: none; /* hidden menus mustn't widen the room */
+    }
+    @media (hover: hover) {
+      .table-wrap:hover:not(.moving) .table-menu { display: flex; }
+    }
+    /* Touch screens have no hover, so the selected table shows its options instead. */
+    @media (hover: none) {
+      .table-wrap.selected .table-menu { display: flex; }
+      .table-wrap.selected .label .x { visibility: visible; }
+    }
+
+    .menu-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .menu-btn.icon { width: 30px; padding: 0; justify-content: center; }
+    .menu-btn svg { width: 18px; height: 18px; }
+    .menu-btn:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+    .menu-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+    .menu-btn:disabled { opacity: 0.35; cursor: default; }
+    .menu-btn.danger:hover:not(:disabled) { color: var(--danger); }
+    .menu-sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+    .seat-count { font-size: 0.8rem; font-weight: 500; min-width: 54px; text-align: center; }
+
+    /* ---------- Add table (bottom centre) ---------- */
+    .add-table {
+      width: 260px;
+      margin: 28px auto 0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      border: 2px dashed var(--accent);
+      border-radius: 16px;
+      color: var(--accent);
+    }
+    .add-table-main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 32px;
+      border-radius: 12px;
+      transition: background 0.15s;
+    }
+    .add-table-main:hover { background: var(--accent-soft); }
+    .add-table-main .plus {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .add-table-main .plus svg { width: 26px; height: 26px; }
+    .add-table-main strong { font-size: 1rem; font-weight: 600; }
+
+    .choose-shape {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .choose-shape:hover, .choose-shape[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+    .choose-shape svg { width: 14px; height: 14px; transition: transform 0.15s; }
+    .choose-shape[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+    .shape-picker { display: flex; gap: 6px; }
+    .shape-picker[hidden] { display: none; }
+    .shape-opt {
+      width: 48px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--ink);
+    }
+    .shape-opt svg { width: 28px; height: 28px; }
+    .shape-opt:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+    /* ---------- Guest card (opens when you click a person) ---------- */
+    .card {
+      position: absolute;
+      z-index: 50;
+      width: 260px;
+      padding: 14px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+    }
+    .card[hidden] { display: none; }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .card-title, .total-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .field { display: block; margin-bottom: 10px; }
+    .field > span { display: block; margin-bottom: 4px; font-size: 0.75rem; color: var(--muted); }
+    .field input, .field select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--ink);
+      font: inherit;
+    }
+    .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+    .card-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    /* ---------- Guest list panel ---------- */
+    .panel {
+      border-left: 1px solid var(--line);
+      background: var(--card);
+      padding: 24px 20px;
+    }
+
+    .total {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 16px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .total-sub { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+    .total-num {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 2.2rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .group { padding: 12px 6px 12px 10px; border-radius: 8px; transition: background 0.15s; }
+    .group.selected { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+    .group.selected .group-head .tname { color: var(--accent); }
+
+    .add-guest-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin: 6px 0 0 22px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      color: var(--accent);
+      font-weight: 500;
+      font-size: 0.85rem;
+    }
+    .add-guest-row:hover { background: var(--card); }
+    .add-guest-row svg { width: 14px; height: 14px; }
+
+    .group-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .group-head .tname { font-size: 1.15rem; padding: 0 2px; text-align: left; }
+
+    .rows { list-style: none; }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 0;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .row.selected { background: var(--card); box-shadow: 0 0 0 1.5px var(--accent); }
+
+    .handle {
+      flex: none;
+      width: 18px;
+      color: var(--faint);
+      cursor: grab;
+      text-align: center;
+      user-select: none;
+      letter-spacing: -2px;
+    }
+
+    .gname {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gname:hover { border-color: var(--line); }
+
+    .row .x { visibility: visible; color: var(--faint); }
+    .row .x:hover { color: var(--card); }
+
+    .empty {
+      padding: 8px;
+      color: var(--faint);
+      font-style: italic;
+      font-size: 0.85rem;
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    /* ---------- Small screens: list goes below the tables ---------- */
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { border-left: none; border-top: 1px solid var(--line); }
+      .topbar { padding: 12px 16px; }
+      .stage { padding: 24px 16px 32px; }
+      .history .label-text { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">Seat Planner</a>
+    <div class="history">
+      <button class="btn" id="undo" title="Undo (Ctrl+Z)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+        <span class="label-text">Undo</span>
+      </button>
+      <button class="btn" id="redo" title="Redo (Ctrl+Y)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg>
+        <span class="label-text">Redo</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <main class="stage">
+      <div class="event">
+        <h1 id="eventName" class="event-name" spellcheck="false"></h1>
+        <button class="icon-btn" id="editEvent" title="Rename event" aria-label="Rename event">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
+      <p class="hint">Click a person to edit them &middot; Click an empty seat to add a guest &middot; Drag a table to move it &middot; Drag names to swap seats</p>
+
+      <div id="floor" class="floor"><div id="room" class="room"></div></div>
+
+      <div class="add-table">
+        <button class="add-table-main" id="addTable">
+          <span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+          <strong>Add table</strong>
+        </button>
+        <button class="choose-shape" id="chooseShape" aria-expanded="false">
+          Choose shape
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="shape-picker" id="shapePicker" hidden></div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <div class="total">
+        <div>
+          <span class="total-label">Total Guest Count</span>
+          <span id="seatsTotal" class="total-sub"></span>
+        </div>
+        <span id="total" class="total-num"></span>
+      </div>
+      <div id="list"></div>
+    </aside>
+  </div>
+
+  <div id="card" class="card" role="dialog" aria-label="Guest details" hidden></div>
+
+  <script>
+    // ================= State =================
+    // Everything on screen is drawn from this one object. Every change goes
+    // through commit(), which records a snapshot first so it can be undone.
+    //
+    // Each table has a list of seats. A seat holds a guest, or null when empty,
+    // so the number of seats is the table's capacity. x/y is where the centre
+    // of the table top sits in the room.
+
+    const STORAGE_KEY = "seat-planner-v1";
+    const SHAPES = ["rect", "square", "round", "oval"];
+
+    const uid = () => Math.random().toString(36).slice(2, 10);
+
+    function defaultState() {
+      const seats = [];
+      for (let i = 1; i <= 6; i++) seats.push({ id: uid(), name: "Guest " + i });
+      return {
+        eventName: "My Upcoming Event",
+        tables: [{ id: uid(), name: "Table 1", shape: "rect", seats }],
+        nextGuest: 7,
+        nextTable: 2,
+      };
+    }
+
+    // Plans saved by the earlier version had "guests" instead of "seats".
+    function upgrade(saved) {
+      for (const t of saved.tables) {
+        if (!t.seats) {
+          t.seats = (t.guests || []).map(g => ({ id: g.id, name: g.name }));
+          if (!t.seats.length) t.seats = Array(6).fill(null);
+          delete t.guests;
+        }
+      }
+      return saved;
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved && Array.isArray(saved.tables) && saved.tables.length) return upgrade(saved);
+      } catch (e) { /* storage unavailable or corrupt: start fresh */ }
+      return defaultState();
+    }
+
+    function save() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+    }
+
+    let state = loadState();
+    let undoStack = [];
+    let redoStack = [];
+    let selectedTableId = null; // highlighted table (shows its options on touch screens)
+
+    // soft = only text changed, so update text in place instead of redrawing
+    // (redrawing mid-click would swallow the click the user is making).
+    function commit(change, soft) {
+      undoStack.push(JSON.stringify(state));
+      if (undoStack.length > 200) undoStack.shift();
+      redoStack = [];
+      change(state);
+      save();
+      if (soft) { syncText(); updateHistoryButtons(); } else render();
+    }
+
+    function undo() {
+      if (!undoStack.length) return;
+      redoStack.push(JSON.stringify(state));
+      state = JSON.parse(undoStack.pop());
+      save();
+      render();
+    }
+
+    function redo() {
+      if (!redoStack.length) return;
+      undoStack.push(JSON.stringify(state));
+      state = JSON.parse(redoStack.pop());
+      save();
+      render();
+    }
+
+    const findTable = (s, id) => s.tables.find(t => t.id === id);
+    const guestsOf = table => table.seats.filter(Boolean);
+
+    function locateGuest(s, guestId) {
+      for (const table of s.tables) {
+        const index = table.seats.findIndex(g => g && g.id === guestId);
+        if (index !== -1) return { table, index, guest: table.seats[index] };
+      }
+      return null;
+    }
+
+    // Puts a guest in the given empty seat, else the first empty seat.
+    // A full table gets an extra chair.
+    function seatGuest(table, guest, seatIndex) {
+      if (seatIndex != null && !table.seats[seatIndex]) { table.seats[seatIndex] = guest; return; }
+      const free = table.seats.indexOf(null);
+      if (free === -1) table.seats.push(guest); else table.seats[free] = guest;
+    }
+
+    // ================= Actions =================
+
+    // Returns the new guest's id so their card can be opened.
+    function addGuest(tableId, seatIndex) {
+      let id;
+      commit(s => {
+        const guest = { id: uid(), name: "Guest " + s.nextGuest++ };
+        id = guest.id;
+        seatGuest(findTable(s, tableId), guest, seatIndex);
+      });
+      return id;
+    }
+
+    // Their chair stays, empty.
+    function removeGuest(guestId) {
+      commit(s => {
+        const found = locateGuest(s, guestId);
+        if (found) found.table.seats[found.index] = null;
+      });
+    }
+
+    function renameGuest(guestId, name) {
+      commit(s => {
+        const found = locateGuest(s, guestId);
+        if (found) found.guest.name = name;
+      }, true);
+    }
+
+    // New tables become the selected table.
+    function newTable(s, shape, seatCount) {
+      const table = { id: uid(), name: "Table " + s.nextTable++, shape, seats: Array(seatCount).fill(null) };
+      selectedTableId = table.id;
+      return table;
+    }
+
+    // No shape given: same shape and size as the last table.
+    function addTable(shape) {
+      commit(s => {
+        const last = s.tables[s.tables.length - 1];
+        const table = newTable(s, shape || last.shape, last.seats.length);
+        Object.assign(table, findFreeSpot(s, table));
+        s.tables.push(table);
+      });
+      scrollToTable(selectedTableId);
+    }
+
+    // Spot to the right of a table, for splitting.
+    const beside = (s, table) => ({ x: table.x + geometry(table).width, y: table.y });
+
+    // Two tables, with the guests and the seats shared between them.
+    function splitTableAndGuests(tableId) {
+      commit(s => {
+        const index = s.tables.findIndex(t => t.id === tableId);
+        const table = s.tables[index];
+        const guests = guestsOf(table);
+        const keep = Math.ceil(guests.length / 2);
+        const seatsA = Math.ceil(table.seats.length / 2);
+        const seatsB = Math.max(1, table.seats.length - seatsA);
+        table.seats = padSeats(guests.slice(0, keep), seatsA);
+        const created = newTable(s, table.shape, seatsB);
+        created.seats = padSeats(guests.slice(keep), seatsB);
+        Object.assign(created, findFreeSpot(s, created, beside(s, table)));
+        s.tables.splice(index + 1, 0, created);
+      });
+    }
+
+    const padSeats = (guests, count) => guests.concat(Array(Math.max(0, count - guests.length)).fill(null));
+
+    // A second, empty table of the same size next to this one; guests stay put.
+    function splitTable(tableId) {
+      commit(s => {
+        const index = s.tables.findIndex(t => t.id === tableId);
+        const table = s.tables[index];
+        const created = newTable(s, table.shape, table.seats.length);
+        Object.assign(created, findFreeSpot(s, created, beside(s, table)));
+        s.tables.splice(index + 1, 0, created);
+      });
+    }
+
+    // Adds a chair, or takes away an empty one.
+    function changeSeats(tableId, delta) {
+      commit(s => {
+        const seats = findTable(s, tableId).seats;
+        if (delta > 0) { seats.push(null); return; }
+        const empty = seats.lastIndexOf(null);
+        if (empty !== -1 && seats.length > 1) seats.splice(empty, 1);
+      });
+    }
+
+    function setShape(tableId, shape) {
+      if (findTable(state, tableId).shape === shape) return;
+      commit(s => { findTable(s, tableId).shape = shape; });
+    }
+
+    function removeTable(tableId) {
+      commit(s => { s.tables = s.tables.filter(t => t.id !== tableId); });
+    }
+
+    function renameTable(tableId, name) {
+      commit(s => { findTable(s, tableId).name = name; }, true);
+    }
+
+    function renameEvent(name) {
+      commit(s => { s.eventName = name; }, true);
+    }
+
+    function moveTable(tableId, x, y) {
+      const table = findTable(state, tableId);
+      if (table.x === x && table.y === y) { render(); return; }
+      commit(s => { Object.assign(findTable(s, tableId), { x, y }); });
+    }
+
+    // Dropped on another guest: swap seats. On an empty seat: sit there.
+    // On a table: take its first empty seat.
+    function moveGuest(guestId, tableId, targetGuestId, seatIndex) {
+      if (guestId === targetGuestId) return;
+      const from = locateGuest(state, guestId);
+      if (!from) return;
+      if (!targetGuestId && seatIndex == null && from.table.id === tableId) return;
+      commit(s => {
+        const a = locateGuest(s, guestId);
+        if (targetGuestId) {
+          const b = locateGuest(s, targetGuestId);
+          a.table.seats[a.index] = b.guest;
+          b.table.seats[b.index] = a.guest;
+        } else {
+          a.table.seats[a.index] = null;
+          seatGuest(findTable(s, tableId), a.guest, seatIndex);
+        }
+      });
+    }
+
+    // ================= Seat geometry =================
+    // Works out the table size and where each seat sits around it,
+    // relative to the table's centre. (nx, ny) points away from the table,
+    // so names can be placed on the outside of each seat.
+
+    const GAP = 28;      // table edge to seat centre
+    const SPACING = 100; // room per seat along a table edge
+
+    function seatLayout(shape, n) {
+      const seats = [];
+      let W, H;
+
+      if (shape === "rect") {
+        const top = Math.ceil(n / 2), bottom = n - top;
+        W = Math.max(2, top) * SPACING;
+        H = 100;
+        const row = (count, y, ny) => {
+          for (let i = 0; i < count; i++) seats.push({ x: -W / 2 + (i + 0.5) * W / count, y, nx: 0, ny });
+        };
+        row(top, -H / 2 - GAP, -1);
+        row(bottom, H / 2 + GAP, 1);
+      } else if (shape === "square") {
+        const perSide = [0, 0, 0, 0];
+        for (let i = 0; i < n; i++) perSide[i % 4]++;
+        W = H = Math.max(150, Math.max(...perSide) * SPACING);
+        const edge = W / 2 + GAP;
+        const side = (count, place) => {
+          for (let i = 0; i < count; i++) seats.push(place(-W / 2 + (i + 0.5) * W / count));
+        };
+        side(perSide[0], t => ({ x: t, y: -edge, nx: 0, ny: -1 }));
+        side(perSide[1], t => ({ x: edge, y: t, nx: 1, ny: 0 }));
+        side(perSide[2], t => ({ x: -t, y: edge, nx: 0, ny: 1 }));
+        side(perSide[3], t => ({ x: -edge, y: -t, nx: -1, ny: 0 }));
+      } else if (shape === "round") {
+        const r = Math.max(70, (n * 90) / (2 * Math.PI));
+        W = H = 2 * r;
+        for (let i = 0; i < n; i++) {
+          const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+          const c = Math.cos(a), s = Math.sin(a);
+          seats.push({ x: c * (r + GAP), y: s * (r + GAP), nx: c, ny: s });
+        }
+      } else { // oval
+        const rx = Math.max(120, (n * 95) / (Math.PI * 1.55)), ry = rx * 0.55;
+        W = 2 * rx;
+        H = 2 * ry;
+        for (let i = 0; i < n; i++) {
+          const a = -Math.PI / 2 + ((i + 0.5) * 2 * Math.PI) / n;
+          const c = Math.cos(a), s = Math.sin(a);
+          let nx = c / rx, ny = s / ry;
+          const len = Math.hypot(nx, ny);
+          nx /= len; ny /= len;
+          seats.push({ x: c * rx + nx * GAP, y: s * ry + ny * GAP, nx, ny });
+        }
+      }
+      return { W, H, seats };
+    }
+
+    const LABEL_W = 120, LABEL_H = 26, SEAT_R = 16, LABEL_OFFSET = 22, MENU_H = 56, PAD = 12;
+
+    // The box a table needs for its top, seats, name labels and menu.
+    // (cx, cy) is the table's centre inside that box.
+    function geometry(table) {
+      const { W, H, seats } = seatLayout(table.shape, table.seats.length);
+      let minX = -W / 2, maxX = W / 2, minY = -H / 2, maxY = H / 2;
+      const placed = seats.map(s => {
+        const lx = s.x + s.nx * LABEL_OFFSET, ly = s.y + s.ny * LABEL_OFFSET;
+        minX = Math.min(minX, s.x - SEAT_R, lx + (-0.5 + 0.5 * s.nx) * LABEL_W);
+        maxX = Math.max(maxX, s.x + SEAT_R, lx + (0.5 + 0.5 * s.nx) * LABEL_W);
+        minY = Math.min(minY, s.y - SEAT_R, ly + (-0.5 + 0.5 * s.ny) * LABEL_H);
+        maxY = Math.max(maxY, s.y + SEAT_R, ly + (0.5 + 0.5 * s.ny) * LABEL_H);
+        return { ...s, lx, ly };
+      });
+      return {
+        W, H, placed,
+        cx: -minX + PAD,
+        cy: -minY + PAD,
+        width: maxX - minX + 2 * PAD,
+        height: maxY - minY + 2 * PAD + MENU_H,
+      };
+    }
+
+    // ================= Room layout =================
+    // Tables snap to the dotted grid and never go past the top or left edge.
+
+    const GRID = 22, MARGIN = 16;
+    const snap = v => Math.round(v / GRID) * GRID;
+    const snapUp = v => Math.ceil(v / GRID) * GRID;
+
+    function box(table, g = geometry(table)) {
+      const left = Math.max(0, table.x - g.cx), top = Math.max(0, table.y - g.cy);
+      return { left, top, right: left + g.width, bottom: top + g.height };
+    }
+
+    // A free grid spot for a table: the one nearest `near` if given,
+    // otherwise the first in reading order (top row first, centre first).
+    function findFreeSpot(s, table, near) {
+      const g = geometry(table);
+      const boxes = s.tables.filter(t => t !== table && t.x != null).map(t => box(t));
+      const roomW = Math.max(floorEl.clientWidth, g.width + 2 * MARGIN);
+      const bottom = boxes.reduce((m, b) => Math.max(m, b.bottom), 0);
+      const centre = roomW / 2;
+      let best = null, bestScore = Infinity;
+      for (let y = snapUp(g.cy + MARGIN); y - g.cy <= bottom + MARGIN; y += GRID) {
+        for (let x = snapUp(g.cx + MARGIN); x - g.cx + g.width + MARGIN <= roomW; x += GRID) {
+          const left = x - g.cx, top = y - g.cy, right = left + g.width, low = top + g.height;
+          const clash = boxes.some(o =>
+            left < o.right + MARGIN && o.left < right + MARGIN && top < o.bottom + MARGIN && o.top < low + MARGIN);
+          if (clash) continue;
+          const score = near ? Math.hypot(x - near.x, y - near.y) : y * 1000 + Math.abs(x - centre);
+          if (score < bestScore) { bestScore = score; best = { x, y }; }
+        }
+      }
+      // Nothing free: start a new row underneath everything.
+      return best || { x: snap(Math.max(centre, g.cx + MARGIN)), y: snapUp(bottom + MARGIN + g.cy) };
+    }
+
+    // Tables from older saves (or a fresh start) have no position yet.
+    function placeUnplaced() {
+      let placed = false;
+      for (const table of state.tables) {
+        if (table.x == null) { Object.assign(table, findFreeSpot(state, table)); placed = true; }
+      }
+      if (placed) save();
+    }
+
+    function scrollToTable(tableId) {
+      const wrap = roomEl.querySelector(`.table-wrap[data-table="${tableId}"]`);
+      if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+
+    // ================= Drawing =================
+
+    const ICONS = {
+      rect: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/></svg>',
+      square: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
+      round: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>',
+      oval: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="10" ry="6"/></svg>',
+      splitGuests: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="8" width="8" height="8" rx="1.5"/><rect x="14" y="8" width="8" height="8" rx="1.5"/><circle cx="6" cy="4" r="1.2"/><circle cx="18" cy="4" r="1.2"/><circle cx="6" cy="20" r="1.2"/><circle cx="18" cy="20" r="1.2"/></svg>',
+      split: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="8" width="8" height="8" rx="1.5"/><rect x="14" y="8" width="8" height="8" rx="1.5" stroke-dasharray="2.5 2"/></svg>',
+      plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+      minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+      trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+    };
+
+    const SHAPE_NAMES = { rect: "Rectangle", square: "Square", round: "Round", oval: "Oval" };
+
+    // "Guest 7" -> "G7", "Anna Smith" -> "AS"
+    const initials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+
+    function countText(table) {
+      const n = guestsOf(table).length, c = table.seats.length;
+      return `${n} / ${c}` + (n === c ? " · Full" : "");
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text != null) node.textContent = text;
+      return node;
+    }
+
+    function iconButton(className, icon, title, onClick) {
+      const b = el("button", className);
+      b.innerHTML = icon;
+      b.title = title;
+      b.setAttribute("aria-label", title);
+      b.addEventListener("click", e => { e.stopPropagation(); onClick(); });
+      return b;
+    }
+
+    const floorEl = document.getElementById("floor");
+    const roomEl = document.getElementById("room");
+    const listEl = document.getElementById("list");
+    const totalEl = document.getElementById("total");
+    const seatsTotalEl = document.getElementById("seatsTotal");
+    const eventEl = document.getElementById("eventName");
+    const cardEl = document.getElementById("card");
+
+    function render() {
+      if (selectedTableId && !findTable(state, selectedTableId)) selectedTableId = null;
+      placeUnplaced();
+      eventEl.textContent = state.eventName;
+      totalEl.textContent = state.tables.reduce((sum, t) => sum + guestsOf(t).length, 0);
+      const seats = state.tables.reduce((sum, t) => sum + t.seats.length, 0);
+      seatsTotalEl.textContent = `${seats} seat${seats === 1 ? "" : "s"}`;
+      renderRoom();
+      listEl.replaceChildren(...state.tables.map(renderGroup));
+      selectTable(selectedTableId);
+      if (cardGuestId) drawCard();
+      updateHistoryButtons();
+    }
+
+    function renderRoom() {
+      roomEl.replaceChildren(...state.tables.map(renderTable));
+      const boxes = state.tables.map(t => box(t));
+      roomEl.style.width = Math.max(floorEl.clientWidth, ...boxes.map(b => b.right)) + "px";
+      roomEl.style.height = Math.max(...boxes.map(b => b.bottom + GRID)) + "px";
+    }
+
+    function selectTable(tableId) {
+      selectedTableId = tableId;
+      document.querySelectorAll("[data-table]").forEach(n => n.classList.toggle("selected", n.dataset.table === tableId));
+    }
+
+    function updateHistoryButtons() {
+      document.getElementById("undo").disabled = !undoStack.length;
+      document.getElementById("redo").disabled = !redoStack.length;
+    }
+
+    // Update names everywhere after a rename, without redrawing.
+    function syncText() {
+      eventEl.textContent = state.eventName;
+      for (const table of state.tables) {
+        document.querySelectorAll(`[data-tname="${table.id}"]`).forEach(n => { n.textContent = table.name; });
+        for (const g of guestsOf(table)) {
+          document.querySelectorAll(`[data-gname="${g.id}"]`).forEach(n => { n.textContent = g.name; });
+          document.querySelectorAll(`[data-seat="${g.id}"]`).forEach(n => { n.textContent = initials(g.name); });
+          document.querySelectorAll(`[data-guest="${g.id}"]`).forEach(n => { n.title = g.name; });
+        }
+      }
+    }
+
+    function renderTable(table) {
+      const g = geometry(table);
+      const { W, H, cx, cy } = g;
+
+      const wrap = el("div", "table-wrap");
+      wrap.dataset.table = table.id;
+      // Any press on a table (its top, a seat, a name, its menu) selects it.
+      wrap.addEventListener("pointerdown", () => selectTable(table.id));
+      const b = box(table, g);
+      Object.assign(wrap.style, { left: b.left + "px", top: b.top + "px", width: g.width + "px", height: g.height + "px" });
+
+      // Table top: drag it to move the table.
+      const surface = el("div", "surface shape-" + table.shape);
+      Object.assign(surface.style, { left: cx - W / 2 + "px", top: cy - H / 2 + "px", width: W + "px", height: H + "px" });
+      const tname = el("span", "tname", table.name);
+      tname.dataset.tname = table.id;
+      tname.title = "Click to rename table";
+      tname.addEventListener("click", e => {
+        e.stopPropagation();
+        startEdit(tname, () => findTable(state, table.id).name, v => renameTable(table.id, v));
+      });
+      const count = el("span", "tcount", countText(table));
+      count.classList.toggle("full", guestsOf(table).length === table.seats.length);
+      const add = el("button", "add-pill");
+      add.innerHTML = ICONS.plus;
+      add.append("Add guest");
+      add.title = "Add a guest to " + table.name;
+      add.addEventListener("click", e => { e.stopPropagation(); openCard(addGuest(table.id), "floor"); });
+      surface.append(tname, count, add);
+      dropTarget(surface, table.id);
+      tableDrag(surface, wrap, table, g);
+      wrap.append(surface);
+
+      // Seats, and names for the ones with someone in them
+      table.seats.forEach((guest, i) => {
+        const p = g.placed[i];
+
+        if (!guest) {
+          const empty = el("button", "seat open");
+          empty.innerHTML = ICONS.plus;
+          empty.title = "Add a guest here";
+          empty.setAttribute("aria-label", "Add a guest here");
+          Object.assign(empty.style, { left: cx + p.x + "px", top: cy + p.y + "px" });
+          empty.addEventListener("click", e => { e.stopPropagation(); openCard(addGuest(table.id, i), "floor"); });
+          dropTarget(empty, table.id, null, i);
+          wrap.append(empty);
+          return;
+        }
+
+        const seat = el("div", "seat", initials(guest.name));
+        seat.dataset.seat = guest.id;
+        seat.dataset.guest = guest.id;
+        seat.title = guest.name;
+        Object.assign(seat.style, { left: cx + p.x + "px", top: cy + p.y + "px" });
+        seat.addEventListener("click", e => { e.stopPropagation(); openCard(guest.id, "floor"); });
+        draggable(seat, guest.id);
+        dropTarget(seat, table.id, guest.id);
+
+        const label = el("div", "label");
+        label.dataset.guest = guest.id;
+        label.title = guest.name;
+        Object.assign(label.style, {
+          left: cx + p.lx + "px",
+          top: cy + p.ly + "px",
+          transform: `translate(${-50 + 50 * p.nx}%, ${-50 + 50 * p.ny}%)`,
+        });
+        const text = el("span", "gtext", guest.name);
+        text.dataset.gname = guest.id;
+        const x = el("button", "x", "×");
+        x.title = "Remove guest";
+        x.setAttribute("aria-label", "Remove guest");
+        x.addEventListener("click", e => { e.stopPropagation(); removeGuest(guest.id); });
+        label.append(text, x);
+        label.addEventListener("click", e => { e.stopPropagation(); openCard(guest.id, "floor"); });
+        draggable(label, guest.id);
+        dropTarget(label, table.id, guest.id);
+
+        wrap.append(seat, label);
+      });
+
+      wrap.append(renderMenu(table));
+      return wrap;
+    }
+
+    // Options under a table, shown on hover.
+    function renderMenu(table) {
+      const menu = el("div", "table-menu");
+      const guestCount = guestsOf(table).length;
+
+      const splitGuestsBtn = el("button", "menu-btn");
+      splitGuestsBtn.innerHTML = ICONS.splitGuests + "<span>Split table and guests</span>";
+      splitGuestsBtn.title = "Make two tables and share the guests between them";
+      splitGuestsBtn.disabled = guestCount < 2;
+      splitGuestsBtn.addEventListener("click", e => { e.stopPropagation(); splitTableAndGuests(table.id); });
+
+      const splitBtn = el("button", "menu-btn");
+      splitBtn.innerHTML = ICONS.split + "<span>Split table</span>";
+      splitBtn.title = "Add an empty table next to this one";
+      splitBtn.addEventListener("click", e => { e.stopPropagation(); splitTable(table.id); });
+
+      menu.append(splitGuestsBtn, splitBtn, el("span", "menu-sep"));
+      for (const shape of SHAPES) {
+        const b = iconButton("menu-btn icon", ICONS[shape], SHAPE_NAMES[shape] + " table", () => setShape(table.id, shape));
+        b.setAttribute("aria-pressed", String(table.shape === shape));
+        menu.append(b);
+      }
+
+      // Seats stepper: can't go below the number of people sat down.
+      menu.append(el("span", "menu-sep"));
+      const fewer = iconButton("menu-btn icon", ICONS.minus, "Remove an empty seat", () => changeSeats(table.id, -1));
+      fewer.disabled = guestCount === table.seats.length || table.seats.length === 1;
+      if (fewer.disabled) fewer.title = "No empty seats to remove";
+      const n = table.seats.length;
+      menu.append(
+        fewer,
+        el("span", "seat-count", `${n} seat${n === 1 ? "" : "s"}`),
+        iconButton("menu-btn icon", ICONS.plus, "Add a seat", () => changeSeats(table.id, 1)),
+      );
+
+      menu.append(el("span", "menu-sep"));
+      const del = iconButton("menu-btn icon danger", ICONS.trash, "Remove table", () => removeTable(table.id));
+      if (guestCount || state.tables.length === 1) {
+        del.disabled = true;
+        del.title = state.tables.length === 1 ? "You need at least one table" : "Move or remove the guests first";
+      }
+      menu.append(del);
+      return menu;
+    }
+
+    function renderGroup(table) {
+      const group = el("section", "group");
+      group.dataset.table = table.id;
+      group.addEventListener("pointerdown", () => selectTable(table.id));
+      dropTarget(group, table.id);
+
+      const head = el("div", "group-head");
+      const tname = el("span", "tname", table.name);
+      tname.dataset.tname = table.id;
+      tname.title = "Click to rename table";
+      tname.addEventListener("click", () => {
+        startEdit(tname, () => findTable(state, table.id).name, v => renameTable(table.id, v));
+      });
+      const guests = guestsOf(table);
+      const count = el("span", "tcount", `(${guests.length}/${table.seats.length})`);
+      count.classList.toggle("full", guests.length === table.seats.length);
+      head.append(tname, count);
+
+      const rows = el("ul", "rows");
+      for (const g of guests) {
+        const row = el("li", "row");
+        row.dataset.guest = g.id;
+        row.addEventListener("click", () => openCard(g.id, "panel"));
+        dropTarget(row, table.id, g.id);
+
+        const handle = el("span", "handle", "⋮⋮");
+        handle.title = "Drag to move";
+        draggable(handle, g.id);
+
+        const name = el("button", "gname", g.name);
+        name.dataset.gname = g.id;
+
+        const x = el("button", "x", "×");
+        x.title = "Remove guest";
+        x.setAttribute("aria-label", "Remove guest");
+        x.addEventListener("click", e => { e.stopPropagation(); removeGuest(g.id); });
+
+        row.append(handle, name, x);
+        rows.append(row);
+      }
+      if (!guests.length) rows.append(el("li", "empty", "No guests yet. Drag someone here."));
+
+      const add = el("button", "add-guest-row");
+      add.innerHTML = ICONS.plus;
+      add.append("Add guest");
+      add.addEventListener("click", () => openCard(addGuest(table.id), "panel"));
+
+      group.append(head, rows, add);
+      return group;
+    }
+
+    // ================= Guest card =================
+    // Opens next to the person you clicked, on the table or in the list.
+    // Seating preferences ("Be on table with", "Avoid table with") will
+    // get their own section between Table and the buttons.
+
+    let cardGuestId = null;
+    let cardSource = "floor"; // "floor" or "panel": where to show the card
+
+    function openCard(guestId, source) {
+      if (cardGuestId && cardGuestId !== guestId) saveCardName();
+      cardGuestId = guestId;
+      cardSource = source;
+      drawCard();
+      const input = cardEl.querySelector("input");
+      if (input) { input.focus({ preventScroll: true }); input.select(); }
+    }
+
+    function drawCard() {
+      const found = locateGuest(state, cardGuestId);
+      if (!found) { closeCard(false); return; }
+
+      const head = el("div", "card-head");
+      head.append(el("span", "card-title", "Guest"),
+        iconButton("icon-btn", "×", "Close", () => closeCard()));
+
+      const nameField = el("label", "field");
+      const input = el("input", "card-name");
+      input.value = found.guest.name;
+      input.addEventListener("change", saveCardName);
+      input.addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); closeCard(); }
+        if (e.key === "Escape") closeCard(false);
+      });
+      nameField.append(el("span", null, "Name"), input);
+
+      const tableField = el("label", "field");
+      const select = el("select");
+      for (const t of state.tables) {
+        const option = el("option", null, `${t.name} (${guestsOf(t).length}/${t.seats.length})`);
+        option.value = t.id;
+        option.selected = t.id === found.table.id;
+        select.append(option);
+      }
+      select.addEventListener("change", () => moveGuest(cardGuestId, select.value));
+      tableField.append(el("span", null, "Table"), select);
+
+      const foot = el("div", "card-foot");
+      const remove = el("button", "btn danger-text", "Remove guest");
+      remove.addEventListener("click", () => removeGuest(cardGuestId));
+      const done = el("button", "btn primary", "Done");
+      done.addEventListener("click", () => closeCard());
+      foot.append(remove, done);
+
+      cardEl.replaceChildren(head, nameField, tableField, foot);
+      cardEl.hidden = false;
+      highlightGuest();
+      positionCard();
+    }
+
+    function saveCardName() {
+      const input = cardEl.querySelector(".card-name");
+      const found = cardGuestId && locateGuest(state, cardGuestId);
+      if (!input || !found) return;
+      const value = input.value.replace(/\s+/g, " ").trim();
+      if (value && value !== found.guest.name) renameGuest(cardGuestId, value);
+      else input.value = found.guest.name;
+    }
+
+    function closeCard(keepTyping = true) {
+      if (!cardGuestId) return;
+      if (keepTyping) saveCardName();
+      cardGuestId = null;
+      cardEl.hidden = true;
+      cardEl.replaceChildren();
+      highlightGuest();
+    }
+
+    function highlightGuest() {
+      document.querySelectorAll("[data-guest]").forEach(n => n.classList.toggle("selected", n.dataset.guest === cardGuestId));
+    }
+
+    // Below the person if there's room on screen, otherwise above.
+    function positionCard() {
+      if (!cardGuestId) return;
+      const anchor = document.querySelector(
+        (cardSource === "panel" ? ".row" : ".label") + `[data-guest="${cardGuestId}"]`);
+      if (!anchor) { closeCard(false); return; }
+      const r = anchor.getBoundingClientRect();
+      const w = cardEl.offsetWidth, h = cardEl.offsetHeight;
+      let top = r.bottom + 8;
+      if (top + h > window.innerHeight - 8 && r.top - h - 8 > 8) top = r.top - h - 8;
+      const maxLeft = document.documentElement.clientWidth - w - 8;
+      const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, maxLeft));
+      cardEl.style.left = left + window.scrollX + "px";
+      cardEl.style.top = top + window.scrollY + "px";
+    }
+
+    // Pressing anywhere else closes the card (and keeps the name typed).
+    document.addEventListener("pointerdown", e => {
+      if (cardGuestId && !e.target.closest("#card, [data-guest]")) closeCard();
+    });
+    floorEl.addEventListener("scroll", positionCard);
+    window.addEventListener("resize", positionCard);
+
+    // ================= Editing text in place =================
+
+    function startEdit(node, getCurrent, onSave) {
+      if (node.isContentEditable) return;
+      const original = getCurrent();
+      let cancelled = false;
+      node.contentEditable = "true";
+      node.focus();
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      const onKey = e => {
+        if (e.key === "Enter") { e.preventDefault(); node.blur(); }
+        if (e.key === "Escape") { cancelled = true; node.blur(); }
+      };
+      const onBlur = () => {
+        node.removeEventListener("keydown", onKey);
+        node.removeEventListener("blur", onBlur);
+        node.contentEditable = "false";
+        const value = node.textContent.replace(/\s+/g, " ").trim();
+        node.textContent = original;
+        if (!cancelled && value && value !== original) onSave(value);
+      };
+      node.addEventListener("keydown", onKey);
+      node.addEventListener("blur", onBlur);
+    }
+
+    // ================= Moving tables =================
+    // Press on a table top and drag. A press without movement is just a click.
+
+    let suppressClick = false;
+
+    function tableDrag(surface, wrap, table, g) {
+      surface.addEventListener("pointerdown", e => {
+        if (e.button !== 0 || e.target.closest("button, [contenteditable='true']")) return;
+        e.preventDefault(); // no text selection while dragging
+        const startX = e.clientX, startY = e.clientY;
+        const left0 = parseFloat(wrap.style.left), top0 = parseFloat(wrap.style.top);
+        // Keep the whole table inside the visible width of the room.
+        const maxLeft = Math.max(0, floorEl.clientWidth - g.width);
+        let moved = false;
+        surface.setPointerCapture(e.pointerId);
+
+        const onMove = ev => {
+          const dx = ev.clientX - startX, dy = ev.clientY - startY;
+          if (!moved && Math.hypot(dx, dy) < 4) return;
+          if (!moved) { moved = true; wrap.classList.add("moving"); closeCard(); }
+          wrap.style.left = Math.min(maxLeft, Math.max(0, left0 + dx)) + "px";
+          wrap.style.top = Math.max(0, top0 + dy) + "px";
+        };
+        const onUp = () => {
+          surface.removeEventListener("pointermove", onMove);
+          surface.removeEventListener("pointerup", onUp);
+          surface.removeEventListener("pointercancel", onUp);
+          if (!moved) return;
+          wrap.classList.remove("moving");
+          suppressClick = true;
+          setTimeout(() => { suppressClick = false; });
+          const x = snap(parseFloat(wrap.style.left) + g.cx);
+          const y = snap(parseFloat(wrap.style.top) + g.cy);
+          moveTable(table.id, Math.max(Math.min(x, Math.floor((maxLeft + g.cx) / GRID) * GRID), snapUp(g.cx)), Math.max(y, snapUp(g.cy)));
+        };
+        surface.addEventListener("pointermove", onMove);
+        surface.addEventListener("pointerup", onUp);
+        surface.addEventListener("pointercancel", onUp);
+      });
+    }
+
+    // The click that ends a drag shouldn't also rename the table.
+    document.addEventListener("click", e => {
+      if (suppressClick) { suppressClick = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
+
+    // Pressing on empty floor clears the table highlight.
+    roomEl.addEventListener("pointerdown", e => { if (e.target === roomEl) selectTable(null); });
+
+    // ================= Moving guests (drag and drop) =================
+
+    let draggingId = null;
+
+    function draggable(node, guestId) {
+      node.draggable = true;
+      node.addEventListener("dragstart", e => {
+        draggingId = guestId;
+        closeCard();
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", guestId);
+      });
+      node.addEventListener("dragend", () => { draggingId = null; clearDropHighlights(); });
+    }
+
+    function dropTarget(node, tableId, guestId, seatIndex) {
+      node.addEventListener("dragover", e => {
+        if (!draggingId) return;
+        e.preventDefault();
+        e.stopPropagation(); // the innermost target (a seat or guest) wins over its table
+        if (!node.classList.contains("drop-over")) {
+          clearDropHighlights();
+          node.classList.add("drop-over");
+        }
+      });
+      node.addEventListener("dragleave", e => {
+        if (!node.contains(e.relatedTarget)) node.classList.remove("drop-over");
+      });
+      node.addEventListener("drop", e => {
+        if (!draggingId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const id = draggingId;
+        draggingId = null;
+        clearDropHighlights();
+        moveGuest(id, tableId, guestId, seatIndex);
+      });
+    }
+
+    function clearDropHighlights() {
+      document.querySelectorAll(".drop-over").forEach(n => n.classList.remove("drop-over"));
+    }
+
+    // ================= Page-level controls =================
+
+    document.getElementById("undo").addEventListener("click", undo);
+    document.getElementById("redo").addEventListener("click", redo);
+    document.getElementById("addTable").addEventListener("click", () => addTable());
+
+    // "Choose shape" opens the shape pictures; picking one adds that table.
+    const chooseShapeBtn = document.getElementById("chooseShape");
+    const shapePicker = document.getElementById("shapePicker");
+    const toggleShapes = open => {
+      shapePicker.hidden = !open;
+      chooseShapeBtn.setAttribute("aria-expanded", String(open));
+    };
+    chooseShapeBtn.addEventListener("click", () => toggleShapes(shapePicker.hidden));
+    for (const shape of SHAPES) {
+      shapePicker.append(iconButton("shape-opt", ICONS[shape], "Add a " + SHAPE_NAMES[shape].toLowerCase() + " table", () => {
+        toggleShapes(false);
+        addTable(shape);
+      }));
+    }
+
+    const editEventName = () => startEdit(eventEl, () => state.eventName, renameEvent);
+    eventEl.addEventListener("click", editEventName);
+    document.getElementById("editEvent").addEventListener("click", editEventName);
+
+    // Ctrl+Z / Ctrl+Y, except while typing (where the browser's own undo applies).
+    document.addEventListener("keydown", e => {
+      const t = e.target;
+      if (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "SELECT") return;
+      if (e.key === "Escape") { closeCard(); return; }
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      else if (key === "y") { e.preventDefault(); redo(); }
+    });
+
+    render();
+  </script>
+</body>
+</html>
