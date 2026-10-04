@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seat Planner</title>
+  <meta name="description" content="Seat Planner helps couples plan wedding seating with ease. Coming soon.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #faf7f2;
+      --ink: #2f2a26;
+      --muted: #7a7068;
+      --accent: #b08d57;
+      --card: #ffffff;
+      --line: #e8e0d4;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1a18;
+        --ink: #f3ede4;
+        --muted: #b3a99c;
+        --accent: #d4b07a;
+        --card: #252220;
+        --line: #3a3531;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", system-ui, sans-serif;
+      text-align: center;
+    }
+
+    main {
+      max-width: 560px;
+      width: 100%;
+      padding: 56px 32px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+    }
+
+    .ornament {
+      color: var(--accent);
+      font-size: 1.5rem;
+      letter-spacing: 0.5em;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-weight: 600;
+      font-size: clamp(2.5rem, 8vw, 3.75rem);
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .tagline {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-style: italic;
+      font-size: clamp(1.15rem, 4vw, 1.4rem);
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 40px;
+    }
+
+    .divider {
+      width: 64px;
+      height: 1px;
+      background: var(--accent);
+      margin: 0 auto 32px;
+    }
+
+    .coming-soon {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 10px 20px;
+      border-radius: 999px;
+    }
+
+    footer {
+      margin-top: 32px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="ornament" aria-hidden="true">&#10086;</div>
+    <h1>Seat Planner</h1>
+    <p class="tagline">Arrange every guest with ease, so your wedding day feels just right.</p>
+    <div class="divider" aria-hidden="true"></div>
+    <span class="coming-soon">Coming soon</span>
+  </main>
+  <footer>&copy; <span id="year"></span> Seat Planner</footer>
+
+  <script>
+    // Fill in the current year automatically so the footer never goes stale.
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
