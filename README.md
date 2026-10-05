@@ -1,6 +1,6 @@
 # Seat Planner
 
-A web app to help couples plan their wedding seating.
+A web app to help couples plan their wedding seating. To be possibly extended to other table planning use cases in the future.
 
 **Status:** Coming soon. Right now this is a simple landing page.
 
@@ -8,7 +8,7 @@ A web app to help couples plan their wedding seating.
 
 ## Who it's for
 
-Brides and grooms planning their wedding who want an easy way to arrange guests at tables.
+Brides and grooms planning their wedding who want an easy way to arrange guests at tables. Future maybe other personas.
 
 ## How it's built
 
