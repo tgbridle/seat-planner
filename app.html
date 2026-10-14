@@ -48,11 +48,18 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      min-height: 100vh;
       background: var(--bg);
       color: var(--ink);
       font-family: "Inter", system-ui, sans-serif;
       font-size: 14px;
+    }
+
+    /* The app fills the window: top bar, then the floor and the guest list. */
+    .app {
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
 
     button {
@@ -65,14 +72,16 @@
 
     /* ---------- Top bar ---------- */
     .topbar {
-      display: flex;
+      flex: none;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      justify-content: space-between;
       gap: 12px;
-      padding: 12px 24px;
+      padding: 8px 20px;
       border-bottom: 1px solid var(--line);
       background: var(--card);
     }
+    .topbar .history { justify-self: end; }
 
     .brand {
       font-family: "Cormorant Garamond", Georgia, serif;
@@ -105,32 +114,37 @@
 
     /* ---------- Layout ---------- */
     .layout {
+      flex: 1;
+      min-height: 0;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 340px;
-      min-height: calc(100vh - 61px);
     }
 
-    .stage { padding: 32px 24px 48px; min-width: 0; }
+    .stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 
     .event {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      margin-bottom: 10px;
+      gap: 4px;
+      min-width: 0;
     }
 
     .event-name {
       font-family: "Cormorant Garamond", Georgia, serif;
       font-weight: 600;
-      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      font-size: 1.5rem;
       line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       padding: 0 6px;
       border-radius: 6px;
       outline: none;
       cursor: text;
     }
-    .event-name[contenteditable="true"] { background: var(--accent-soft); }
+    .event-name:hover { background: var(--accent-soft); }
+    .event-name[contenteditable="true"] { background: var(--accent-soft); text-overflow: clip; }
 
     .icon-btn {
       display: inline-flex;
@@ -144,24 +158,21 @@
     .icon-btn:hover { color: var(--accent); background: var(--accent-soft); }
     .icon-btn svg { width: 18px; height: 18px; }
 
-    .hint {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.8rem;
-      margin-bottom: 20px;
-    }
+    .icon-btn.small { width: 26px; height: 26px; }
+    .icon-btn.small svg { width: 14px; height: 14px; }
 
     /* ---------- Floor plan (the "room") ---------- */
-    .floor { overflow: auto; border-radius: 12px; }
+    /* The floor fills the space; it only scrolls if tables go past the edge. */
+    .floor { position: absolute; inset: 0; overflow: auto; }
     .room {
       position: relative;
-      min-height: 240px;
       background-image: radial-gradient(var(--line) 1px, transparent 1px);
       background-size: 22px 22px;
     }
 
     .table-wrap { position: absolute; }
-    .table-wrap:hover { z-index: 5; }
+    .table-wrap.menu-open { z-index: 5; }
+    .table-wrap:hover { z-index: 6; }
     .table-wrap.moving { z-index: 20; }
 
     .surface {
@@ -200,7 +211,12 @@
       max-width: 90%;
       text-align: center;
     }
-    .tname[contenteditable="true"] { background: var(--accent-soft); user-select: text; }
+    .tname:hover { background: var(--accent-soft); }
+    .tname[contenteditable="true"] {
+      background: var(--accent-soft);
+      box-shadow: 0 0 0 1.5px var(--accent);
+      user-select: text;
+    }
     .tcount { color: var(--muted); font-size: 0.8rem; }
     .tcount.full { color: var(--ok); font-weight: 600; }
 
@@ -300,7 +316,8 @@
     .drop-over.group { background: var(--accent-soft); }
     .drop-over.row { outline: 2px dashed var(--accent); }
 
-    /* Table menu (appears on hover, or tap on touch screens) */
+    /* Table menu: shown for the selected table, and for the table the mouse
+       is over (it lingers for a few seconds after the mouse leaves). */
     .table-menu {
       position: absolute;
       left: 50%;
@@ -316,12 +333,10 @@
       white-space: nowrap;
       display: none; /* hidden menus mustn't widen the room */
     }
-    @media (hover: hover) {
-      .table-wrap:hover:not(.moving) .table-menu { display: flex; }
-    }
-    /* Touch screens have no hover, so the selected table shows its options instead. */
+    .table-wrap.menu-open:not(.moving) .table-menu { display: flex; animation: fade-in 0.12s ease-out; }
+    @keyframes fade-in { from { opacity: 0; transform: translate(-50%, 4px); } }
+    /* Touch screens have no hover, so the selected table shows its remove buttons. */
     @media (hover: none) {
-      .table-wrap.selected .table-menu { display: flex; }
       .table-wrap.selected .label .x { visibility: visible; }
     }
 
@@ -344,71 +359,80 @@
     .menu-sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
     .seat-count { font-size: 0.8rem; font-weight: 500; min-width: 54px; text-align: center; }
 
-    /* ---------- Add table (bottom centre) ---------- */
+    /* ---------- Add table (floating, top centre of the floor) ---------- */
     .add-table {
-      width: 260px;
-      margin: 28px auto 0;
-      padding: 16px;
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 10px;
-      border: 2px dashed var(--accent);
-      border-radius: 16px;
-      color: var(--accent);
+      padding: 4px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
     }
     .add-table-main {
-      display: flex;
-      flex-direction: column;
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 32px;
-      border-radius: 12px;
-      transition: background 0.15s;
-    }
-    .add-table-main:hover { background: var(--accent-soft); }
-    .add-table-main .plus {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
+      gap: 6px;
+      height: 34px;
+      padding: 0 14px 0 10px;
+      border-radius: 999px 0 0 999px;
       background: var(--accent);
       color: var(--card);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      font-weight: 600;
+      transition: opacity 0.15s;
     }
-    .add-table-main .plus svg { width: 26px; height: 26px; }
-    .add-table-main strong { font-size: 1rem; font-weight: 600; }
+    .add-table-main:hover { opacity: 0.88; }
+    .add-table-main svg { width: 18px; height: 18px; }
 
     .choose-shape {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 4px 12px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      color: var(--muted);
-      font-size: 0.8rem;
-      font-weight: 500;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      margin-left: 1px;
+      border-radius: 0 999px 999px 0;
+      background: var(--accent);
+      color: var(--card);
+      transition: opacity 0.15s;
     }
-    .choose-shape:hover, .choose-shape[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
-    .choose-shape svg { width: 14px; height: 14px; transition: transform 0.15s; }
+    .choose-shape:hover, .choose-shape[aria-expanded="true"] { opacity: 0.88; }
+    .choose-shape svg { width: 16px; height: 16px; transition: transform 0.15s; }
     .choose-shape[aria-expanded="true"] svg { transform: rotate(180deg); }
 
-    .shape-picker { display: flex; gap: 6px; }
+    .shape-picker {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: repeat(4, 72px);
+      gap: 4px;
+      padding: 6px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+    }
     .shape-picker[hidden] { display: none; }
     .shape-opt {
-      width: 48px;
-      height: 44px;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      border: 1px solid var(--line);
+      gap: 4px;
+      padding: 8px 4px 6px;
       border-radius: 10px;
       color: var(--ink);
+      font-size: 0.75rem;
+      font-weight: 500;
     }
     .shape-opt svg { width: 28px; height: 28px; }
-    .shape-opt:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+    .shape-opt:hover { background: var(--accent-soft); color: var(--accent); }
 
     /* ---------- Guest card (opens when you click a person) ---------- */
     .card {
@@ -428,7 +452,7 @@
       justify-content: space-between;
       margin-bottom: 8px;
     }
-    .card-title, .total-label {
+    .card-title {
       font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.12em;
@@ -460,24 +484,48 @@
     .panel {
       border-left: 1px solid var(--line);
       background: var(--card);
-      padding: 24px 20px;
+      overflow-y: auto;
+      min-height: 0;
     }
 
-    .total {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 16px;
-      margin-bottom: 8px;
+    /* Guest totals, pinned to the top of the list */
+    .stats {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 20px 20px 16px;
+      background: var(--card);
       border-bottom: 1px solid var(--line);
     }
-    .total-sub { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+    .stats-main { display: flex; align-items: baseline; gap: 8px; }
     .total-num {
       font-family: "Cormorant Garamond", Georgia, serif;
-      font-size: 2.2rem;
+      font-size: 2.6rem;
+      line-height: 1;
       font-weight: 600;
-      color: var(--accent);
+      color: var(--ink);
     }
+    .total-label { font-size: 1rem; font-weight: 500; color: var(--muted); }
+    .stats-sub { margin-top: 8px; font-size: 0.9rem; }
+    .stats-sub strong { font-weight: 600; }
+    .unseated-note { color: var(--faint); }
+    .unseated-note.some { color: var(--danger); font-weight: 500; }
+    .meter {
+      height: 6px;
+      margin-top: 10px;
+      border-radius: 999px;
+      background: var(--line);
+      overflow: hidden;
+    }
+    .meter-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--ok);
+      transition: width 0.3s ease;
+    }
+
+    #list { padding: 12px 14px 24px; }
 
     .group { padding: 12px 6px 12px 10px; border-radius: 8px; transition: background 0.15s; }
     .group.selected { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
@@ -503,7 +551,59 @@
       gap: 6px;
       margin-bottom: 6px;
     }
-    .group-head .tname { font-size: 1.15rem; padding: 0 2px; text-align: left; }
+    .group-head .tname { font-size: 1.15rem; padding: 0 4px; text-align: left; }
+    .group-head .edit-name { opacity: 0; transition: opacity 0.15s; }
+    .group:hover .edit-name, .edit-name:focus-visible { opacity: 1; }
+    @media (hover: none) { .group-head .edit-name { opacity: 0.6; } }
+
+    /* "No table": guests who haven't been given a seat yet */
+    .group.unseated {
+      margin-bottom: 8px;
+      border: 1.5px dashed var(--line);
+      background: var(--bg);
+    }
+    .group.unseated.has-guests { border-color: var(--danger); }
+    .group.unseated .group-head { justify-content: space-between; padding-right: 4px; }
+    .unseated-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .unseated-title svg { width: 15px; height: 15px; }
+    .badge {
+      min-width: 22px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--line);
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .has-guests .badge { background: var(--danger); color: var(--card); }
+    .group.unseated .add-guest-row:hover { background: var(--accent-soft); }
+
+    .add-table-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1.5px dashed var(--accent);
+      border-radius: 10px;
+      color: var(--accent);
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .add-table-row:hover { background: var(--accent-soft); }
+    .add-table-row svg { width: 16px; height: 16px; }
 
     .rows { list-style: none; }
 
@@ -555,17 +655,29 @@
 
     /* ---------- Small screens: list goes below the tables ---------- */
     @media (max-width: 860px) {
+      .app { height: auto; }
       .layout { grid-template-columns: 1fr; }
-      .panel { border-left: none; border-top: 1px solid var(--line); }
-      .topbar { padding: 12px 16px; }
-      .stage { padding: 24px 16px 32px; }
+      .stage { height: 70vh; height: 70dvh; }
+      .panel { border-left: none; border-top: 1px solid var(--line); overflow: visible; }
+      .topbar { padding: 8px 16px; gap: 8px; }
       .history .label-text { display: none; }
+    }
+    @media (max-width: 520px) {
+      .brand { display: none; }
+      .topbar { grid-template-columns: 1fr auto; }
     }
   </style>
 </head>
 <body>
+<div class="app">
   <header class="topbar">
     <a class="brand" href="index.html">Seat Planner</a>
+    <div class="event">
+      <h1 id="eventName" class="event-name" spellcheck="false" title="Click to rename"></h1>
+      <button class="icon-btn small" id="editEvent" title="Rename event" aria-label="Rename event">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+    </div>
     <div class="history">
       <button class="btn" id="undo" title="Undo (Ctrl+Z)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
@@ -580,40 +692,35 @@
 
   <div class="layout">
     <main class="stage">
-      <div class="event">
-        <h1 id="eventName" class="event-name" spellcheck="false"></h1>
-        <button class="icon-btn" id="editEvent" title="Rename event" aria-label="Rename event">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        </button>
-      </div>
-      <p class="hint">Click a person to edit them &middot; Click an empty seat to add a guest &middot; Drag a table to move it &middot; Drag names to swap seats</p>
-
       <div id="floor" class="floor"><div id="room" class="room"></div></div>
 
       <div class="add-table">
-        <button class="add-table-main" id="addTable">
-          <span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
-          <strong>Add table</strong>
+        <button class="add-table-main" id="addTable" title="Add a table like the last one">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add table
         </button>
-        <button class="choose-shape" id="chooseShape" aria-expanded="false">
-          Choose shape
+        <button class="choose-shape" id="chooseShape" aria-expanded="false" title="Choose a shape" aria-label="Choose a shape">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="shape-picker" id="shapePicker" hidden></div>
       </div>
     </main>
 
-    <aside class="panel">
-      <div class="total">
-        <div>
-          <span class="total-label">Total Guest Count</span>
-          <span id="seatsTotal" class="total-sub"></span>
+    <aside class="panel" id="panel">
+      <div class="stats">
+        <div class="stats-main">
+          <span id="total" class="total-num"></span>
+          <span id="totalLabel" class="total-label"></span>
         </div>
-        <span id="total" class="total-num"></span>
+        <div class="stats-sub">
+          <strong id="seated"></strong> seated <span id="unseatedNote" class="unseated-note"></span>
+        </div>
+        <div class="meter" aria-hidden="true"><span id="meterFill" class="meter-fill"></span></div>
       </div>
       <div id="list"></div>
     </aside>
   </div>
+</div>
 
   <div id="card" class="card" role="dialog" aria-label="Guest details" hidden></div>
 
@@ -624,7 +731,8 @@
     //
     // Each table has a list of seats. A seat holds a guest, or null when empty,
     // so the number of seats is the table's capacity. x/y is where the centre
-    // of the table top sits in the room.
+    // of the table top sits in the room. Guests without a table wait in
+    // `unseated`.
 
     const STORAGE_KEY = "seat-planner-v1";
     const SHAPES = ["rect", "square", "round", "oval"];
@@ -637,13 +745,16 @@
       return {
         eventName: "My Upcoming Event",
         tables: [{ id: uid(), name: "Table 1", shape: "rect", seats }],
+        unseated: [],
         nextGuest: 7,
         nextTable: 2,
       };
     }
 
-    // Plans saved by the earlier version had "guests" instead of "seats".
+    // Plans saved by earlier versions had "guests" instead of "seats",
+    // and no unseated list.
     function upgrade(saved) {
+      if (!Array.isArray(saved.unseated)) saved.unseated = [];
       for (const t of saved.tables) {
         if (!t.seats) {
           t.seats = (t.guests || []).map(g => ({ id: g.id, name: g.name }));
@@ -669,7 +780,7 @@
     let state = loadState();
     let undoStack = [];
     let redoStack = [];
-    let selectedTableId = null; // highlighted table (shows its options on touch screens)
+    let selectedTableId = null; // highlighted table (its options stay showing)
 
     // soft = only text changed, so update text in place instead of redrawing
     // (redrawing mid-click would swallow the click the user is making).
@@ -701,12 +812,22 @@
     const findTable = (s, id) => s.tables.find(t => t.id === id);
     const guestsOf = table => table.seats.filter(Boolean);
 
+    const allGuests = s => s.tables.flatMap(guestsOf).concat(s.unseated);
+
+    // `list` is the table's seats, or the unseated list (then `table` is null).
     function locateGuest(s, guestId) {
       for (const table of s.tables) {
         const index = table.seats.findIndex(g => g && g.id === guestId);
-        if (index !== -1) return { table, index, guest: table.seats[index] };
+        if (index !== -1) return { table, list: table.seats, index, guest: table.seats[index] };
       }
-      return null;
+      const index = s.unseated.findIndex(g => g.id === guestId);
+      return index === -1 ? null : { table: null, list: s.unseated, index, guest: s.unseated[index] };
+    }
+
+    // A seated guest leaves an empty chair behind; an unseated one just goes.
+    function takeOut(found) {
+      if (found.table) found.list[found.index] = null;
+      else found.list.splice(found.index, 1);
     }
 
     // Puts a guest in the given empty seat, else the first empty seat.
@@ -719,22 +840,23 @@
 
     // ================= Actions =================
 
+    // No tableId: the guest goes on the "No table" list.
     // Returns the new guest's id so their card can be opened.
     function addGuest(tableId, seatIndex) {
       let id;
       commit(s => {
         const guest = { id: uid(), name: "Guest " + s.nextGuest++ };
         id = guest.id;
-        seatGuest(findTable(s, tableId), guest, seatIndex);
+        if (tableId) seatGuest(findTable(s, tableId), guest, seatIndex);
+        else s.unseated.push(guest);
       });
       return id;
     }
 
-    // Their chair stays, empty.
     function removeGuest(guestId) {
       commit(s => {
         const found = locateGuest(s, guestId);
-        if (found) found.table.seats[found.index] = null;
+        if (found) takeOut(found);
       });
     }
 
@@ -811,8 +933,12 @@
       commit(s => { findTable(s, tableId).shape = shape; });
     }
 
+    // Anyone sitting there moves to "No table".
     function removeTable(tableId) {
-      commit(s => { s.tables = s.tables.filter(t => t.id !== tableId); });
+      commit(s => {
+        s.unseated.push(...guestsOf(findTable(s, tableId)));
+        s.tables = s.tables.filter(t => t.id !== tableId);
+      });
     }
 
     function renameTable(tableId, name) {
@@ -830,21 +956,23 @@
     }
 
     // Dropped on another guest: swap seats. On an empty seat: sit there.
-    // On a table: take its first empty seat.
+    // On a table: take its first empty seat. No tableId: "No table".
     function moveGuest(guestId, tableId, targetGuestId, seatIndex) {
       if (guestId === targetGuestId) return;
       const from = locateGuest(state, guestId);
       if (!from) return;
-      if (!targetGuestId && seatIndex == null && from.table.id === tableId) return;
+      const fromTableId = from.table ? from.table.id : null;
+      if (!targetGuestId && seatIndex == null && fromTableId === tableId) return;
       commit(s => {
         const a = locateGuest(s, guestId);
         if (targetGuestId) {
           const b = locateGuest(s, targetGuestId);
-          a.table.seats[a.index] = b.guest;
-          b.table.seats[b.index] = a.guest;
+          a.list[a.index] = b.guest;
+          b.list[b.index] = a.guest;
         } else {
-          a.table.seats[a.index] = null;
-          seatGuest(findTable(s, tableId), a.guest, seatIndex);
+          takeOut(a);
+          if (tableId) seatGuest(findTable(s, tableId), a.guest, seatIndex);
+          else s.unseated.push(a.guest);
         }
       });
     }
@@ -931,14 +1059,15 @@
     }
 
     // ================= Room layout =================
-    // Tables snap to the dotted grid and never go past the top or left edge.
+    // Tables snap to the dotted grid and never go past the left edge, or up
+    // under the "Add table" button at the top.
 
-    const GRID = 22, MARGIN = 16;
+    const GRID = 22, MARGIN = 16, TOP = 3 * GRID;
     const snap = v => Math.round(v / GRID) * GRID;
     const snapUp = v => Math.ceil(v / GRID) * GRID;
 
     function box(table, g = geometry(table)) {
-      const left = Math.max(0, table.x - g.cx), top = Math.max(0, table.y - g.cy);
+      const left = Math.max(0, table.x - g.cx), top = Math.max(TOP, table.y - g.cy);
       return { left, top, right: left + g.width, bottom: top + g.height };
     }
 
@@ -951,7 +1080,7 @@
       const bottom = boxes.reduce((m, b) => Math.max(m, b.bottom), 0);
       const centre = roomW / 2;
       let best = null, bestScore = Infinity;
-      for (let y = snapUp(g.cy + MARGIN); y - g.cy <= bottom + MARGIN; y += GRID) {
+      for (let y = snapUp(g.cy + TOP); y - g.cy <= Math.max(bottom, TOP) + MARGIN; y += GRID) {
         for (let x = snapUp(g.cx + MARGIN); x - g.cx + g.width + MARGIN <= roomW; x += GRID) {
           const left = x - g.cx, top = y - g.cy, right = left + g.width, low = top + g.height;
           const clash = boxes.some(o =>
@@ -962,7 +1091,7 @@
         }
       }
       // Nothing free: start a new row underneath everything.
-      return best || { x: snap(Math.max(centre, g.cx + MARGIN)), y: snapUp(bottom + MARGIN + g.cy) };
+      return best || { x: snap(Math.max(centre, g.cx + MARGIN)), y: snapUp(Math.max(bottom + MARGIN, TOP) + g.cy) };
     }
 
     // Tables from older saves (or a fresh start) have no position yet.
@@ -974,9 +1103,10 @@
       if (placed) save();
     }
 
+    // On the floor and in the guest list.
     function scrollToTable(tableId) {
-      const wrap = roomEl.querySelector(`.table-wrap[data-table="${tableId}"]`);
-      if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      document.querySelectorAll(`[data-table="${tableId}"]`).forEach(n =>
+        n.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" }));
     }
 
     // ================= Drawing =================
@@ -991,6 +1121,8 @@
       plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
       minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>',
       trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+      pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+      person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
     };
 
     const SHAPE_NAMES = { rect: "Rectangle", square: "Square", round: "Round", oval: "Oval" };
@@ -1021,9 +1153,8 @@
 
     const floorEl = document.getElementById("floor");
     const roomEl = document.getElementById("room");
+    const panelEl = document.getElementById("panel");
     const listEl = document.getElementById("list");
-    const totalEl = document.getElementById("total");
-    const seatsTotalEl = document.getElementById("seatsTotal");
     const eventEl = document.getElementById("eventName");
     const cardEl = document.getElementById("card");
 
@@ -1031,27 +1162,76 @@
       if (selectedTableId && !findTable(state, selectedTableId)) selectedTableId = null;
       placeUnplaced();
       eventEl.textContent = state.eventName;
-      totalEl.textContent = state.tables.reduce((sum, t) => sum + guestsOf(t).length, 0);
-      const seats = state.tables.reduce((sum, t) => sum + t.seats.length, 0);
-      seatsTotalEl.textContent = `${seats} seat${seats === 1 ? "" : "s"}`;
+      renderStats();
       renderRoom();
-      listEl.replaceChildren(...state.tables.map(renderGroup));
+      listEl.replaceChildren(renderUnseated(), ...state.tables.map(renderGroup), renderAddTableRow());
       selectTable(selectedTableId);
       if (cardGuestId) drawCard();
       updateHistoryButtons();
     }
 
+    // "20 total guests / 19 seated (1 unseated)", plus a progress bar.
+    function renderStats() {
+      const total = allGuests(state).length, unseated = state.unseated.length, seated = total - unseated;
+      document.getElementById("total").textContent = total;
+      document.getElementById("totalLabel").textContent = total === 1 ? "total guest" : "total guests";
+      document.getElementById("seated").textContent = seated;
+      const note = document.getElementById("unseatedNote");
+      note.textContent = `(${unseated} unseated)`;
+      note.classList.toggle("some", unseated > 0);
+      document.getElementById("meterFill").style.width = (total ? (seated / total) * 100 : 0) + "%";
+    }
+
     function renderRoom() {
       roomEl.replaceChildren(...state.tables.map(renderTable));
+      sizeRoom();
+    }
+
+    // The room covers the whole floor, and grows if tables go past its edge.
+    function sizeRoom() {
       const boxes = state.tables.map(t => box(t));
-      roomEl.style.width = Math.max(floorEl.clientWidth, ...boxes.map(b => b.right)) + "px";
-      roomEl.style.height = Math.max(...boxes.map(b => b.bottom + GRID)) + "px";
+      roomEl.style.width = Math.max(floorEl.clientWidth, ...boxes.map(b => b.right + MARGIN)) + "px";
+      roomEl.style.height = Math.max(floorEl.clientHeight, ...boxes.map(b => b.bottom + GRID)) + "px";
     }
 
     function selectTable(tableId) {
       selectedTableId = tableId;
       document.querySelectorAll("[data-table]").forEach(n => n.classList.toggle("selected", n.dataset.table === tableId));
+      showMenus();
     }
+
+    // ----- Table menus -----
+    // The selected table always shows its menu. The table under the mouse
+    // shows it too, and keeps it for 5 seconds after the mouse leaves, unless
+    // the mouse moves onto another table or you click somewhere else.
+
+    const MENU_LINGER = 5000;
+    let hoverTableId = null;
+    let hoverTimer = null;
+
+    function showMenus() {
+      roomEl.querySelectorAll(".table-wrap").forEach(w =>
+        w.classList.toggle("menu-open", w.dataset.table === selectedTableId || w.dataset.table === hoverTableId));
+    }
+
+    function setHoverTable(tableId) {
+      clearTimeout(hoverTimer);
+      hoverTableId = tableId;
+      showMenus();
+    }
+
+    function hoverMenu(wrap, tableId) {
+      wrap.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") setHoverTable(tableId); });
+      wrap.addEventListener("pointerleave", e => {
+        if (e.pointerType !== "mouse" || hoverTableId !== tableId) return;
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => setHoverTable(null), MENU_LINGER);
+      });
+    }
+
+    document.addEventListener("pointerdown", e => {
+      if (hoverTableId && !e.target.closest(`.table-wrap[data-table="${hoverTableId}"]`)) setHoverTable(null);
+    });
 
     function updateHistoryButtons() {
       document.getElementById("undo").disabled = !undoStack.length;
@@ -1063,12 +1243,17 @@
       eventEl.textContent = state.eventName;
       for (const table of state.tables) {
         document.querySelectorAll(`[data-tname="${table.id}"]`).forEach(n => { n.textContent = table.name; });
-        for (const g of guestsOf(table)) {
-          document.querySelectorAll(`[data-gname="${g.id}"]`).forEach(n => { n.textContent = g.name; });
-          document.querySelectorAll(`[data-seat="${g.id}"]`).forEach(n => { n.textContent = initials(g.name); });
-          document.querySelectorAll(`[data-guest="${g.id}"]`).forEach(n => { n.title = g.name; });
-        }
       }
+      for (const g of allGuests(state)) {
+        document.querySelectorAll(`[data-gname="${g.id}"]`).forEach(n => { n.textContent = g.name; });
+        document.querySelectorAll(`[data-seat="${g.id}"]`).forEach(n => { n.textContent = initials(g.name); });
+        document.querySelectorAll(`[data-guest="${g.id}"]`).forEach(n => { n.title = g.name; });
+      }
+    }
+
+    // Click a table's name (on the floor or in the list) to rename it.
+    function editTableName(node, tableId) {
+      startEdit(node, () => findTable(state, tableId).name, v => renameTable(tableId, v));
     }
 
     function renderTable(table) {
@@ -1079,6 +1264,7 @@
       wrap.dataset.table = table.id;
       // Any press on a table (its top, a seat, a name, its menu) selects it.
       wrap.addEventListener("pointerdown", () => selectTable(table.id));
+      hoverMenu(wrap, table.id);
       const b = box(table, g);
       Object.assign(wrap.style, { left: b.left + "px", top: b.top + "px", width: g.width + "px", height: g.height + "px" });
 
@@ -1088,10 +1274,7 @@
       const tname = el("span", "tname", table.name);
       tname.dataset.tname = table.id;
       tname.title = "Click to rename table";
-      tname.addEventListener("click", e => {
-        e.stopPropagation();
-        startEdit(tname, () => findTable(state, table.id).name, v => renameTable(table.id, v));
-      });
+      tname.addEventListener("click", e => { e.stopPropagation(); editTableName(tname, table.id); });
       const count = el("span", "tcount", countText(table));
       count.classList.toggle("full", guestsOf(table).length === table.seats.length);
       const add = el("button", "add-pill");
@@ -1191,10 +1374,11 @@
       );
 
       menu.append(el("span", "menu-sep"));
-      const del = iconButton("menu-btn icon danger", ICONS.trash, "Remove table", () => removeTable(table.id));
-      if (guestCount || state.tables.length === 1) {
+      const del = iconButton("menu-btn icon danger", ICONS.trash,
+        guestCount ? "Remove table (its guests move to No table)" : "Remove table", () => removeTable(table.id));
+      if (state.tables.length === 1) {
         del.disabled = true;
-        del.title = state.tables.length === 1 ? "You need at least one table" : "Move or remove the guests first";
+        del.title = "You need at least one table";
       }
       menu.append(del);
       return menu;
@@ -1210,20 +1394,41 @@
       const tname = el("span", "tname", table.name);
       tname.dataset.tname = table.id;
       tname.title = "Click to rename table";
-      tname.addEventListener("click", () => {
-        startEdit(tname, () => findTable(state, table.id).name, v => renameTable(table.id, v));
-      });
+      tname.addEventListener("click", () => editTableName(tname, table.id));
       const guests = guestsOf(table);
       const count = el("span", "tcount", `(${guests.length}/${table.seats.length})`);
       count.classList.toggle("full", guests.length === table.seats.length);
-      head.append(tname, count);
+      const edit = iconButton("icon-btn small edit-name", ICONS.pencil, "Rename table", () => editTableName(tname, table.id));
+      head.append(tname, count, edit);
 
+      group.append(head, renderRows(guests, table.id, "No guests yet. Drag someone here."), addGuestRow(table.id));
+      return group;
+    }
+
+    // Guests who haven't been given a table yet. Always at the top of the list.
+    function renderUnseated() {
+      const guests = state.unseated;
+      const group = el("section", "group unseated");
+      group.classList.toggle("has-guests", guests.length > 0);
+      dropTarget(group, null);
+
+      const head = el("div", "group-head");
+      const title = el("span", "unseated-title");
+      title.innerHTML = ICONS.person;
+      title.append("No table");
+      head.append(title, el("span", "badge", guests.length));
+
+      group.append(head, renderRows(guests, null, "Everyone has a seat. Drag a guest here to unseat them."), addGuestRow(null));
+      return group;
+    }
+
+    function renderRows(guests, tableId, emptyText) {
       const rows = el("ul", "rows");
       for (const g of guests) {
         const row = el("li", "row");
         row.dataset.guest = g.id;
         row.addEventListener("click", () => openCard(g.id, "panel"));
-        dropTarget(row, table.id, g.id);
+        dropTarget(row, tableId, g.id);
 
         const handle = el("span", "handle", "⋮⋮");
         handle.title = "Drag to move";
@@ -1240,15 +1445,24 @@
         row.append(handle, name, x);
         rows.append(row);
       }
-      if (!guests.length) rows.append(el("li", "empty", "No guests yet. Drag someone here."));
+      if (!guests.length) rows.append(el("li", "empty", emptyText));
+      return rows;
+    }
 
+    function addGuestRow(tableId) {
       const add = el("button", "add-guest-row");
       add.innerHTML = ICONS.plus;
       add.append("Add guest");
-      add.addEventListener("click", () => openCard(addGuest(table.id), "panel"));
+      add.addEventListener("click", () => openCard(addGuest(tableId), "panel"));
+      return add;
+    }
 
-      group.append(head, rows, add);
-      return group;
+    function renderAddTableRow() {
+      const add = el("button", "add-table-row");
+      add.innerHTML = ICONS.plus;
+      add.append("Add table");
+      add.addEventListener("click", () => addTable());
+      return add;
     }
 
     // ================= Guest card =================
@@ -1288,13 +1502,17 @@
 
       const tableField = el("label", "field");
       const select = el("select");
+      const none = el("option", null, "No table");
+      none.value = "";
+      none.selected = !found.table;
+      select.append(none);
       for (const t of state.tables) {
         const option = el("option", null, `${t.name} (${guestsOf(t).length}/${t.seats.length})`);
         option.value = t.id;
-        option.selected = t.id === found.table.id;
+        option.selected = !!found.table && t.id === found.table.id;
         select.append(option);
       }
-      select.addEventListener("change", () => moveGuest(cardGuestId, select.value));
+      select.addEventListener("change", () => moveGuest(cardGuestId, select.value || null));
       tableField.append(el("span", null, "Table"), select);
 
       const foot = el("div", "card-foot");
@@ -1333,10 +1551,11 @@
     }
 
     // Below the person if there's room on screen, otherwise above.
+    // Guests with no table are only in the list.
     function positionCard() {
       if (!cardGuestId) return;
-      const anchor = document.querySelector(
-        (cardSource === "panel" ? ".row" : ".label") + `[data-guest="${cardGuestId}"]`);
+      const anchor = (cardSource === "floor" && document.querySelector(`.label[data-guest="${cardGuestId}"]`))
+        || document.querySelector(`.row[data-guest="${cardGuestId}"]`);
       if (!anchor) { closeCard(false); return; }
       const r = anchor.getBoundingClientRect();
       const w = cardEl.offsetWidth, h = cardEl.offsetHeight;
@@ -1353,7 +1572,8 @@
       if (cardGuestId && !e.target.closest("#card, [data-guest]")) closeCard();
     });
     floorEl.addEventListener("scroll", positionCard);
-    window.addEventListener("resize", positionCard);
+    panelEl.addEventListener("scroll", positionCard);
+    window.addEventListener("resize", () => { sizeRoom(); positionCard(); });
 
     // ================= Editing text in place =================
 
@@ -1399,30 +1619,31 @@
         // Keep the whole table inside the visible width of the room.
         const maxLeft = Math.max(0, floorEl.clientWidth - g.width);
         let moved = false;
-        surface.setPointerCapture(e.pointerId);
+        // Listen on the window rather than capturing the pointer: capturing
+        // would send the click to the table top instead of the name inside it.
 
         const onMove = ev => {
           const dx = ev.clientX - startX, dy = ev.clientY - startY;
           if (!moved && Math.hypot(dx, dy) < 4) return;
           if (!moved) { moved = true; wrap.classList.add("moving"); closeCard(); }
           wrap.style.left = Math.min(maxLeft, Math.max(0, left0 + dx)) + "px";
-          wrap.style.top = Math.max(0, top0 + dy) + "px";
+          wrap.style.top = Math.max(TOP, top0 + dy) + "px";
         };
         const onUp = () => {
-          surface.removeEventListener("pointermove", onMove);
-          surface.removeEventListener("pointerup", onUp);
-          surface.removeEventListener("pointercancel", onUp);
+          window.removeEventListener("pointermove", onMove);
+          window.removeEventListener("pointerup", onUp);
+          window.removeEventListener("pointercancel", onUp);
           if (!moved) return;
           wrap.classList.remove("moving");
           suppressClick = true;
           setTimeout(() => { suppressClick = false; });
           const x = snap(parseFloat(wrap.style.left) + g.cx);
           const y = snap(parseFloat(wrap.style.top) + g.cy);
-          moveTable(table.id, Math.max(Math.min(x, Math.floor((maxLeft + g.cx) / GRID) * GRID), snapUp(g.cx)), Math.max(y, snapUp(g.cy)));
+          moveTable(table.id, Math.max(Math.min(x, Math.floor((maxLeft + g.cx) / GRID) * GRID), snapUp(g.cx)), Math.max(y, snapUp(g.cy + TOP)));
         };
-        surface.addEventListener("pointermove", onMove);
-        surface.addEventListener("pointerup", onUp);
-        surface.addEventListener("pointercancel", onUp);
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
       });
     }
 
@@ -1483,7 +1704,7 @@
     document.getElementById("redo").addEventListener("click", redo);
     document.getElementById("addTable").addEventListener("click", () => addTable());
 
-    // "Choose shape" opens the shape pictures; picking one adds that table.
+    // The arrow next to "Add table" opens the shapes; picking one adds that table.
     const chooseShapeBtn = document.getElementById("chooseShape");
     const shapePicker = document.getElementById("shapePicker");
     const toggleShapes = open => {
@@ -1492,11 +1713,16 @@
     };
     chooseShapeBtn.addEventListener("click", () => toggleShapes(shapePicker.hidden));
     for (const shape of SHAPES) {
-      shapePicker.append(iconButton("shape-opt", ICONS[shape], "Add a " + SHAPE_NAMES[shape].toLowerCase() + " table", () => {
+      const opt = iconButton("shape-opt", ICONS[shape], "Add a " + SHAPE_NAMES[shape].toLowerCase() + " table", () => {
         toggleShapes(false);
         addTable(shape);
-      }));
+      });
+      opt.append(SHAPE_NAMES[shape]);
+      shapePicker.append(opt);
     }
+    document.addEventListener("pointerdown", e => {
+      if (!shapePicker.hidden && !e.target.closest(".add-table")) toggleShapes(false);
+    });
 
     const editEventName = () => startEdit(eventEl, () => state.eventName, renameEvent);
     eventEl.addEventListener("click", editEventName);
@@ -1506,7 +1732,13 @@
     document.addEventListener("keydown", e => {
       const t = e.target;
       if (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "SELECT") return;
-      if (e.key === "Escape") { closeCard(); return; }
+      if (e.key === "Escape") {
+        // Close the top-most thing: shapes, then the guest card, then the table.
+        if (!shapePicker.hidden) toggleShapes(false);
+        else if (cardGuestId) closeCard();
+        else { selectTable(null); setHoverTable(null); }
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey)) return;
       const key = e.key.toLowerCase();
       if (key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
